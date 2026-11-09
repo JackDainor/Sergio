@@ -4,15 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#193b32">
-  <title>Taller Costura | Administración</title>
+  <meta name="description" content="SY CROP — Control de producción de costura. Registra cortes, proveedores e informes PDF.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SY CROP">
+  <title>SY CROP | Administración</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand-mark">TC</div>
-  <div class="brand"><strong>Taller Costura</strong><span>Control de producción</span></div>
-  <button id="themeBtn" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">☼</button>
+  <img class="brand-logo" src="logo.png" alt="SY CROP" width="40" height="40">
+  <div class="brand"><strong>SY CROP</strong><span>Moda femenina · Tejido suplex</span></div>
+  <div class="topbar-actions">
+    <button id="installBtn" class="install-btn hidden" title="Instalar aplicación" aria-label="Instalar aplicación">Instalar</button>
+    <button id="themeBtn" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">☼</button>
+  </div>
 </header>
 <main class="container">
   <section class="welcome">
@@ -45,12 +54,12 @@
     <div id="emptyProviders" class="empty"><div class="empty-art">♧</div><h3>Añade tu primer proveedor</h3><p>Los cortes se organizan por proveedor y por mes.</p></div>
   </section>
   <section id="reportsPanel" class="panel hidden">
-    <div class="section-heading"><div><h2>Informes mensuales</h2><p class="muted">Genera un PDF A4 separado para cada proveedor.</p></div></div>
-    <div class="report-note">Cada informe incluye la foto del modelo, cantidad de prendas, precio por prenda y total por corte, además del resultado final del mes.</div>
+    <div class="section-heading"><div><h2>Informes mensuales</h2><p class="muted">Genera y comparte un PDF A4 separado para cada proveedor.</p></div></div>
+    <div class="report-note">Cada informe incluye la foto del modelo, cantidad de prendas, precio por prenda, total por corte, el resultado final del mes y el QR de pago Pix (puedes elegir la cuenta de Irma o de Sergio) para facilitar el cobro.</div>
     <div id="reportsList" class="provider-grid"></div>
     <div id="emptyReports" class="empty hidden"><div class="empty-art">▧</div><h3>Informes listos cuando los necesites</h3><p>Registra proveedores y cortes para generar sus PDF.</p></div>
   </section>
-  <footer><span>Hecho para organizar tu taller.</span><span>Datos guardados en este dispositivo</span></footer>
+  <footer><span>SY CROP · Moda femenina</span><span>Datos guardados en este dispositivo</span></footer>
 </main>
 <div id="cutModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cutModalTitle">
   <div class="modal-card">
@@ -74,6 +83,19 @@
 <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-card confirm-card"><div class="modal-head"><h2 id="confirmTitle">Confirmar acción</h2><button class="icon-btn" id="closeConfirm">×</button></div><p id="confirmText"></p><div class="modal-actions"><button class="secondary" id="confirmNo">Cancelar</button><button class="danger" id="confirmYes">Eliminar</button></div></div>
 </div>
+
+<div id="qrChoiceModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="qrChoiceTitle">
+  <div class="modal-card confirm-card">
+    <div class="modal-head"><h2 id="qrChoiceTitle">¿A qué cuenta cobrar?</h2><button class="icon-btn" id="closeQrChoice" aria-label="Cerrar">×</button></div>
+    <p>Elige el QR de Pix que se incluirá en el PDF del informe.</p>
+    <div class="qr-choice-actions">
+      <button type="button" class="primary qr-choice-btn" data-qr="irma">Irma<br><small>CNPJ 67.731.252/0001-61</small></button>
+      <button type="button" class="primary qr-choice-btn" data-qr="sergio">Sergio<br><small>CNPJ 68.129.560/0001-84</small></button>
+    </div>
+    <div class="modal-actions" style="margin-top:12px"><button class="secondary" id="cancelQrChoice">Cancelar</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="app.js"></script>
