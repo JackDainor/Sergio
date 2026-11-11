@@ -27,11 +27,15 @@
     function loadState() {
         try {
             const x = JSON.parse(localStorage.getItem(STORE_KEY));
-            if (x && Array.isArray(x.providers) && Array.isArray(x.cuts)) return x;
+            if (x && Array.isArray(x.providers) && Array.isArray(x.cuts)) {
+                if (!Array.isArray(x.vales)) x.vales = [];
+                return x;
+            }
         } catch (e) {}
         return {
             providers: [],
             cuts: [],
+            vales: [],
             theme: 'light'
         };
     }
@@ -69,6 +73,15 @@
         return (Number(c.pieces) || 0) * (Number(c.price) || 0);
     }
 
+    function getMonthVales(providerId) {
+        const m = $('monthFilter').value;
+        return (state.vales || []).filter(v => v.date?.startsWith(m) && (!providerId || v.providerId === providerId));
+    }
+
+    function valeTotal(list) {
+        return (list || []).reduce((s, v) => s + (Number(v.amount) || 0), 0);
+    }
+
     function showToast(msg) {
         const el = $('toast');
         el.textContent = msg;
@@ -79,15 +92,18 @@
 
     function setTab(tab) {
         document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-        ['cuts', 'providers', 'reports'].forEach(t => $(t + 'Panel').classList.toggle('hidden', t !== tab));
+        ['cuts', 'providers', 'reports', 'vales'].forEach(t => $(t + 'Panel').classList.toggle('hidden', t !== tab));
         if (tab === 'providers') renderProviders();
         if (tab === 'reports') renderReports();
+        if (tab === 'vales') renderVales();
     }
 
     function syncProviderSelects() {
         const opts = state.providers.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => `<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)}</option>`).join('');
         $('cutProvider').innerHTML = '<option value="">Selecciona un proveedor</option>' + opts;
         $('providerFilter').innerHTML = '<option value="">Todos los proveedores</option>' + opts;
+        if ($('valeProvider')) $('valeProvider').innerHTML = '<option value="">Selecciona un proveedor</option>' + opts;
+        if ($('valeProviderFilter')) $('valeProviderFilter').innerHTML = '<option value="">Todos los proveedores</option>' + opts;
     }
 
     function renderStats() {
@@ -135,10 +151,32 @@
         $('reportsList').innerHTML = ps.map(p => {
             const cuts = state.cuts.filter(c => c.providerId === p.id && c.date?.startsWith(m));
             const total = cuts.reduce((s, c) => s + cutTotal(c), 0);
-            return `<article class="report-card"><div class="provider-icon">▧</div><div class="provider-main"><h3>${escapeHTML(p.name)}</h3><p>${cuts.length} cortes · ${cuts.reduce((s,c)=>s+Number(c.pieces||0),0)} prendas · ${money(total)}</p></div><button class="primary" data-pdf="${p.id}" ${cuts.length?'':'disabled'}>Compartir PDF ↗</button></article>`;
+            const valesSum = valeTotal(getMonthVales(p.id));
+            const neto = total - valesSum;
+            const valesTxt = valesSum > 0 ? ` · Vales ${money(valesSum)}` : '';
+            return `<article class="report-card"><div class="provider-icon">▧</div><div class="provider-main"><h3>${escapeHTML(p.name)}</h3><p>${cuts.length} cortes · ${cuts.reduce((s,c)=>s+Number(c.pieces||0),0)} prendas · ${money(total)}${valesTxt}<br><strong>A pagar: ${money(neto)}</strong></p></div><button class="primary" data-pdf="${p.id}" ${cuts.length?'':'disabled'}>Compartir PDF ↗</button></article>`;
         }).join('');
         $('emptyReports').classList.toggle('hidden', ps.length > 0);
         if (!ps.length) $('reportsList').innerHTML = '';
+    }
+
+    
+    function renderVales() {
+        const m = $('monthFilter').value;
+        const pid = $('valeProviderFilter') ? $('valeProviderFilter').value : '';
+        const list = (state.vales || []).filter(v => v.date?.startsWith(m) && (!pid || v.providerId === pid))
+            .sort((a, b) => b.date.localeCompare(a.date) || (b.id || '').localeCompare(a.id || ''));
+        const el = $('valesList');
+        if (!el) return;
+        el.innerHTML = list.map(v => {
+            const p = getProvider(v.providerId);
+            return `<article class="cut-card vale-card"><div class="cut-thumb vale-thumb">$</div><div class="cut-info"><h3>${money(v.amount)}</h3><div class="cut-meta"><span>♧ ${escapeHTML(p?.name || 'Proveedor eliminado')}</span><span>${escapeHTML(v.date)}</span>${v.note ? `<span>${escapeHTML(v.note)}</span>` : ''}</div></div><div class="cut-money"><div class="cut-actions"><button class="mini-btn" data-vale-edit="${v.id}">Editar</button><button class="mini-btn" data-vale-delete="${v.id}">Eliminar</button></div></div></article>`;
+        }).join('');
+        const empty = $('emptyVales');
+        if (empty) {
+            empty.classList.toggle('hidden', list.length > 0);
+            el.classList.toggle('hidden', list.length === 0);
+        }
     }
 
     function renderAll() {
@@ -146,6 +184,7 @@
         renderCuts();
         renderProviders();
         renderReports();
+        renderVales();
     }
 
     function openCut(c = null) {
@@ -270,7 +309,7 @@
         });
         y += 7;
         // Leave space at bottom for totals bar + QR
-        const footerY = pageH - 52;
+        const footerY = pageH - 62;
         const available = footerY - y - 4;
         const rowH = Math.min(29, Math.max(13, available / cuts.length));
         let totalPieces = 0,
@@ -323,19 +362,31 @@
             doc.setTextColor(170, 50, 50);
             doc.text('Aviso: el número de cortes excede el espacio disponible; algunos registros pueden no aparecer.', margin, y + 3);
         }
-        // Totals bar (left side, narrower to leave room for QR)
-        const sy = pageH - 48;
+        // Vales del proveedor en el mes
+        const providerVales = getMonthVales(providerId);
+        const valesSum = valeTotal(providerVales);
+        const netoPagar = totalMoney - valesSum;
+
+        // Totals bar (left side, narrower to leave room for QR) — más alto para vales
+        const sy = pageH - 56;
         const barW = pageW - margin * 2 - 42;
         doc.setFillColor(232, 242, 236);
-        doc.roundedRect(margin, sy, barW, 16, 2, 2, 'F');
+        doc.roundedRect(margin, sy, barW, 24, 2, 2, 'F');
         doc.setTextColor(45, 105, 85);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.text(`Total de cortes: ${cuts.length}`, margin + 4, sy + 6);
-        doc.text(`Total de prendas: ${totalPieces.toLocaleString('es-ES')}`, margin + 4, sy + 12);
+        doc.setFontSize(7.5);
+        doc.text(`Cortes: ${cuts.length}  ·  Prendas: ${totalPieces.toLocaleString('es-ES')}`, margin + 4, sy + 5.5);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text(`TOTAL DEL MES: ${money(totalMoney)}`, margin + barW - 4, sy + 9.5, {
+        doc.setFontSize(9);
+        doc.text(`TOTAL DEL MES: ${money(totalMoney)}`, margin + 4, sy + 11.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(150, 70, 50);
+        doc.text(`Vales del mes: ${money(valesSum)}`, margin + 4, sy + 17);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(25, 59, 50);
+        doc.text(`TOTAL A PAGAR: ${money(netoPagar)}`, margin + barW - 4, sy + 16.5, {
             align: 'right'
         });
         // QR de pagamento (Pix) en la parte inferior derecha
@@ -344,7 +395,7 @@
             const qrImg = await loadImage(qrFile);
             const qrSize = 36;
             const qrX = pageW - margin - qrSize;
-            const qrY = pageH - 48;
+            const qrY = pageH - 56;
             doc.addImage(qrImg, 'PNG', qrX, qrY, qrSize, qrSize);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(5.5);
@@ -394,6 +445,23 @@
             img.src = src;
         });
     }
+
+    function openVale(v = null) {
+        $('valeId').value = v ? v.id : '';
+        $('valeModalTitle').textContent = v ? 'Editar vale' : 'Registrar vale';
+        $('valeProvider').value = v ? v.providerId : '';
+        $('valeDate').value = v ? v.date : todayISO();
+        $('valeAmount').value = v ? v.amount : '';
+        $('valeNote').value = v ? (v.note || '') : '';
+        $('valeModal').classList.remove('hidden');
+        $('valeProvider').focus();
+    }
+    function closeVale() {
+        $('valeModal').classList.add('hidden');
+        $('valeForm').reset();
+        $('valeId').value = '';
+    }
+
     document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
     $('monthFilter').value = monthISO();
     $('monthFilter').addEventListener('change', renderAll);
@@ -528,6 +596,7 @@
             askConfirm('Eliminar proveedor', `¿Eliminar “${p.name}”? También se eliminarán ${count} corte(s) asociado(s). Esta acción no se puede deshacer.`, () => {
                 state.providers = state.providers.filter(x => x.id !== p.id);
                 state.cuts = state.cuts.filter(c => c.providerId !== p.id);
+                state.vales = (state.vales || []).filter(v => v.providerId !== p.id);
                 save();
                 renderAll();
                 showToast('Proveedor eliminado.');
@@ -556,6 +625,7 @@
             closeCut();
             closeConfirm();
             closeQrChoice();
+            closeVale();
         }
     });
     document.body.classList.toggle('dark', state.theme === 'dark');
@@ -584,6 +654,74 @@
             closeQrChoice();
             if (pid) exportPDF(pid, qr);
         });
+    });
+
+
+    // —— Vales ——
+    if ($('addValeBtn')) $('addValeBtn').addEventListener('click', () => {
+        if (!state.providers.length) { setTab('providers'); showToast('Primero añade un proveedor.'); return; }
+        openVale();
+    });
+    if ($('emptyAddValeBtn')) $('emptyAddValeBtn').addEventListener('click', () => {
+        if (!state.providers.length) { setTab('providers'); return; }
+        openVale();
+    });
+    if ($('closeVale')) $('closeVale').addEventListener('click', closeVale);
+    if ($('cancelVale')) $('cancelVale').addEventListener('click', closeVale);
+    if ($('valeProviderFilter')) $('valeProviderFilter').addEventListener('change', renderVales);
+    if ($('valeForm')) $('valeForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const id = $('valeId').value;
+        const providerId = $('valeProvider').value;
+        const date = $('valeDate').value;
+        const amount = Number($('valeAmount').value);
+        const note = $('valeNote').value.trim();
+        if (!providerId || !date || !(amount > 0)) {
+            showToast('Completa proveedor, fecha y monto válido.');
+            return;
+        }
+        if (!state.vales) state.vales = [];
+        if (id) {
+            const v = state.vales.find(x => x.id === id);
+            if (v) {
+                v.providerId = providerId;
+                v.date = date;
+                v.amount = amount;
+                v.note = note;
+            }
+        } else {
+            state.vales.push({
+                id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                providerId,
+                date,
+                amount,
+                note
+            });
+        }
+        save();
+        closeVale();
+        renderAll();
+        showToast(id ? 'Vale actualizado.' : 'Vale registrado.');
+    });
+    if ($('valesList')) $('valesList').addEventListener('click', e => {
+        const edit = e.target.closest('[data-vale-edit]');
+        if (edit) {
+            const v = (state.vales || []).find(x => x.id === edit.dataset.valeEdit);
+            if (v) openVale(v);
+            return;
+        }
+        const del = e.target.closest('[data-vale-delete]');
+        if (del) {
+            const v = (state.vales || []).find(x => x.id === del.dataset.valeDelete);
+            if (!v) return;
+            const p = getProvider(v.providerId);
+            askConfirm('Eliminar vale', `¿Eliminar el vale de ${money(v.amount)} (${p?.name || 'proveedor'}) del ${v.date}?`, () => {
+                state.vales = (state.vales || []).filter(x => x.id !== v.id);
+                save();
+                renderAll();
+                showToast('Vale eliminado.');
+            });
+        }
     });
 
     // PWA install prompt

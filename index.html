@@ -37,6 +37,7 @@
     <button class="tab active" data-tab="cuts">Cortes</button>
     <button class="tab" data-tab="providers">Proveedores</button>
     <button class="tab" data-tab="reports">Informes PDF</button>
+    <button class="tab" data-tab="vales">Vales</button>
   </nav>
   <section id="cutsPanel" class="panel">
     <div class="section-heading"><div><h2>Cortes del mes</h2><p class="muted">Cada bolsa de corte es un registro independiente.</p></div><button class="primary" id="addCutBtn">＋ Registrar corte</button></div>
@@ -55,10 +56,20 @@
   </section>
   <section id="reportsPanel" class="panel hidden">
     <div class="section-heading"><div><h2>Informes mensuales</h2><p class="muted">Genera y comparte un PDF A4 separado para cada proveedor.</p></div></div>
-    <div class="report-note">Cada informe incluye la foto del modelo, cantidad de prendas, precio por prenda, total por corte, el resultado final del mes y el QR de pago Pix (puedes elegir la cuenta de Irma o de Sergio) para facilitar el cobro.</div>
+    <div class="report-note">Cada informe incluye la foto del modelo, cantidad de prendas, precio por prenda, total por corte, el resultado final del mes los vales/adelantos del mes, el total a pagar y el QR de pago Pix (Irma o Sergio).</div>
     <div id="reportsList" class="provider-grid"></div>
     <div id="emptyReports" class="empty hidden"><div class="empty-art">▧</div><h3>Informes listos cuando los necesites</h3><p>Registra proveedores y cortes para generar sus PDF.</p></div>
   </section>
+
+  <section id="valesPanel" class="panel hidden">
+    <div class="section-heading"><div><h2>Vales y adelantos</h2><p class="muted">Registra los adelantos que pides a cada proveedor durante el mes.</p></div><button class="primary" id="addValeBtn">＋ Registrar vale</button></div>
+    <div class="filters">
+      <select id="valeProviderFilter"><option value="">Todos los proveedores</option></select>
+    </div>
+    <div id="valesList" class="cuts-list"></div>
+    <div id="emptyVales" class="empty hidden"><div class="empty-art">$</div><h3>Sin vales este mes</h3><p>Cuando pidas un adelanto a un proveedor, regístralo aquí para que aparezca en su informe PDF.</p><button class="primary" id="emptyAddValeBtn">Registrar primer vale</button></div>
+  </section>
+
   <footer><span>SY CROP · Moda femenina</span><span>Datos guardados en este dispositivo</span></footer>
 </main>
 <div id="cutModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cutModalTitle">
@@ -80,6 +91,23 @@
     </form>
   </div>
 </div>
+
+<div id="valeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="valeModalTitle">
+  <div class="modal-card">
+    <div class="modal-head"><div><p class="eyebrow">ADELANTO / VALE</p><h2 id="valeModalTitle">Registrar vale</h2></div><button class="icon-btn" id="closeVale" aria-label="Cerrar">×</button></div>
+    <form id="valeForm">
+      <input id="valeId" type="hidden">
+      <div class="form-grid">
+        <label class="full">Proveedor<select id="valeProvider" required><option value="">Selecciona un proveedor</option></select><small>El vale se descontará en el informe PDF de este proveedor.</small></label>
+        <label>Fecha<input id="valeDate" type="date" required></label>
+        <label>Monto (R$)<input id="valeAmount" type="number" min="0.01" step="0.01" required placeholder="100,00"></label>
+        <label class="full">Nota <span class="optional">(opcional)</span><input id="valeNote" maxlength="120" placeholder="Ej. Adelanto por material"></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="secondary" id="cancelVale">Cancelar</button><button type="submit" class="primary">Guardar vale</button></div>
+    </form>
+  </div>
+</div>
+
 <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-card confirm-card"><div class="modal-head"><h2 id="confirmTitle">Confirmar acción</h2><button class="icon-btn" id="closeConfirm">×</button></div><p id="confirmText"></p><div class="modal-actions"><button class="secondary" id="confirmNo">Cancelar</button><button class="danger" id="confirmYes">Eliminar</button></div></div>
 </div>

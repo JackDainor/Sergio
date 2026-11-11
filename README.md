@@ -8,6 +8,7 @@ Aplicación en español para registrar proveedores y cortes de confección, calc
 - Cálculo automático: cantidad × precio por prenda.
 - Resumen mensual: cantidad de cortes, prendas y total generado.
 - Informes PDF separados por proveedor para el mes elegido, con **QR de Pix** para pago fácil.
+- **Vales / adelantos**: registra adelantos por proveedor; se descuentan en el PDF (Total del mes → Vales → Total a pagar).
 - **Compartir PDF** directo a WhatsApp, Messenger u otras apps (Web Share API en móviles).
 - **Instalar como aplicación** (PWA) desde el botón “Instalar”.
 - Tema claro/oscuro.

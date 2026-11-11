@@ -13,3 +13,8 @@ body.dark{--bg:#111a16;--surface:#19251f;--text:#e6eee9;--muted:#9aaca2;--line:#
 .qr-choice-actions{display:flex;flex-direction:column;gap:10px;margin:16px 0 4px}
 .qr-choice-btn{padding:14px 16px;text-align:left;line-height:1.35}
 .qr-choice-btn small{display:block;font-weight:500;opacity:.85;margin-top:2px;font-size:11px}
+
+.vale-thumb{background:var(--pale)!important;color:var(--green2);font-weight:800;font-size:20px;display:grid;place-items:center}
+.vale-card .cut-info h3{color:var(--green2)}
+.tabs{flex-wrap:wrap}
+@media (max-width:520px){.tabs .tab{font-size:12px;padding:8px 10px}}
