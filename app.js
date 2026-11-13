@@ -21,6 +21,7 @@
     };
     let state = loadState(),
         photoData = '',
+        fjPhotoData = '',
         pendingConfirm = null,
         toastTimer;
 
@@ -29,6 +30,9 @@
             const x = JSON.parse(localStorage.getItem(STORE_KEY));
             if (x && Array.isArray(x.providers) && Array.isArray(x.cuts)) {
                 if (!Array.isArray(x.vales)) x.vales = [];
+                if (!Array.isArray(x.funcionarios)) x.funcionarios = [];
+                if (!Array.isArray(x.funcJobs)) x.funcJobs = [];
+                if (!Array.isArray(x.funcVales)) x.funcVales = [];
                 return x;
             }
         } catch (e) {}
@@ -36,6 +40,9 @@
             providers: [],
             cuts: [],
             vales: [],
+            funcionarios: [],
+            funcJobs: [],
+            funcVales: [],
             theme: 'light'
         };
     }
@@ -92,10 +99,19 @@
 
     function setTab(tab) {
         document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-        ['cuts', 'providers', 'reports', 'vales'].forEach(t => $(t + 'Panel').classList.toggle('hidden', t !== tab));
+        ['cuts', 'providers', 'reports', 'vales', 'funcs', 'funcJobs', 'funcVales'].forEach(t => {
+            const el = $(t + 'Panel');
+            if (el) el.classList.toggle('hidden', t !== tab);
+        });
+        document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('.sidebar-link').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         if (tab === 'providers') renderProviders();
         if (tab === 'reports') renderReports();
         if (tab === 'vales') renderVales();
+        if (tab === 'funcs') renderFuncs();
+        if (tab === 'funcJobs') renderFuncJobs();
+        if (tab === 'funcVales') renderFuncVales();
+        closeSidebar();
     }
 
     function syncProviderSelects() {
@@ -185,9 +201,13 @@
         renderProviders();
         renderReports();
         renderVales();
+        renderFuncs();
+        renderFuncJobs();
+        renderFuncVales();
+        renderPendingBanner();
     }
 
-    function openCut(c = null) {
+    function openCut(c = null, fromJob = null) {
         if (!state.providers.length) {
             showToast('Primero registra un proveedor.');
             setTab('providers');
@@ -197,13 +217,14 @@
         }
         $('cutForm').reset();
         $('cutId').value = c?.id || '';
-        $('cutModalTitle').textContent = c ? 'Editar corte' : 'Registrar corte';
-        $('cutDate').value = c?.date || todayISO();
+        $('pendingJobId').value = fromJob?.id || '';
+        $('cutModalTitle').textContent = fromJob ? 'Completar corte (desde funcionarios)' : (c ? 'Editar corte' : 'Registrar corte');
+        $('cutDate').value = c?.date || fromJob?.date || todayISO();
         $('cutProvider').value = c?.providerId || '';
-        $('cutModel').value = c?.model || '';
-        $('cutPieces').value = c?.pieces ?? '';
+        $('cutModel').value = c?.model || fromJob?.title || '';
+        $('cutPieces').value = c?.pieces ?? fromJob?.pieces ?? '';
         $('cutPrice').value = c?.price ?? '';
-        photoData = c?.photo || '';
+        photoData = c?.photo || fromJob?.photo || '';
         updateTotal();
         renderPhotoPreview();
         $('cutModal').classList.remove('hidden');
@@ -462,6 +483,188 @@
         $('valeId').value = '';
     }
 
+
+    // —— Funcionarios ——
+    const DEFAULT_RECTA = 1.0;
+    const DEFAULT_OVER = 0.4;
+
+    function getFunc(id) {
+        return (state.funcionarios || []).find(f => f.id === id);
+    }
+
+    function pendingFuncJobs() {
+        return (state.funcJobs || []).filter(j => j.pendingProvider !== false && !j.linkedCutId);
+    }
+
+    function renderPendingBanner() {
+        const box = $('pendingJobsBanner');
+        if (!box) return;
+        const list = pendingFuncJobs().filter(j => {
+            const m = $('monthFilter').value;
+            return !m || (j.date || '').startsWith(m);
+        });
+        if (!list.length) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+        }
+        box.classList.remove('hidden');
+        box.innerHTML = `<h3>Pendiente: completar corte de proveedor (${list.length})</h3>` +
+            list.map(j => {
+                const thumb = j.photo ? `<img src="${j.photo}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--pale);display:grid;place-items:center">✂</div>`;
+                return `<div class="pending-item">${thumb}<div class="meta"><strong>${escapeHTML(j.title)}</strong><span class="muted">${j.pieces} prendas · ${escapeHTML(j.date)} · ${money(j.totalPay || 0)}</span></div><button type="button" class="primary" data-complete-job="${j.id}">Completar registro</button></div>`;
+            }).join('');
+    }
+
+    function renderFuncs() {
+        const list = $('funcsList');
+        if (!list) return;
+        const fs = (state.funcionarios || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+        list.innerHTML = fs.map(f => {
+            const m = $('monthFilter').value;
+            const jobs = (state.funcJobs || []).filter(j => (j.date || '').startsWith(m) && (j.workers || []).some(w => w.funcionarioId === f.id));
+            const earned = jobs.reduce((s, j) => {
+                const w = (j.workers || []).find(x => x.funcionarioId === f.id);
+                return s + (Number(w?.pay) || 0);
+            }, 0);
+            const vales = (state.funcVales || []).filter(v => v.funcionarioId === f.id && (v.date || '').startsWith(m));
+            const valeSum = vales.reduce((s, v) => s + Number(v.amount || 0), 0);
+            return `<article class="provider-card"><div class="provider-icon">👤</div><div class="provider-main"><h3>${escapeHTML(f.name)}</h3><p>Este mes: ${money(earned)} · Vales ${money(valeSum)} · Neto ${money(earned - valeSum)}</p></div><div class="provider-actions"><button class="mini-btn" data-func-del="${f.id}">Eliminar</button></div></article>`;
+        }).join('');
+        $('emptyFuncs').classList.toggle('hidden', fs.length > 0);
+        list.classList.toggle('hidden', fs.length === 0);
+    }
+
+    function renderFuncJobs() {
+        const el = $('funcJobsList');
+        if (!el) return;
+        const m = $('monthFilter').value;
+        const jobs = (state.funcJobs || []).filter(j => (j.date || '').startsWith(m)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        el.innerHTML = jobs.map(j => {
+            const names = (j.workers || []).map(w => {
+                const f = getFunc(w.funcionarioId);
+                const extra = w.machine ? ` (${w.machine})` : '';
+                return `${escapeHTML(f?.name || '?')}${extra} ${money(w.pay || 0)}`;
+            }).join(' · ');
+            const st = j.linkedCutId ? '<span class="badge-done">Corte OK</span>' : '<span class="badge-pending">Pendiente proveedor</span>';
+            const thumb = j.photo ? `<img src="${j.photo}" alt="">` : '✂';
+            return `<article class="cut-card"><div class="cut-thumb">${typeof thumb === 'string' && thumb.startsWith('<') ? thumb : thumb}</div><div class="cut-info"><h3>${escapeHTML(j.title)} ${st}</h3><div class="cut-meta"><span>${j.pieces} prendas</span><span>${escapeHTML(j.date)}</span><span>${j.payMode === 'por_maquina' ? 'Por máquina' : 'Pago completo'}</span></div><p class="muted" style="margin:6px 0 0;font-size:12px">${names}</p></div><div class="cut-money"><div><strong>${money(j.totalPay)}</strong><small>a pagar</small></div><div class="cut-actions">${!j.linkedCutId ? `<button class="mini-btn" data-complete-job="${j.id}">Completar</button>` : ''}<button class="mini-btn" data-func-job-del="${j.id}">Eliminar</button></div></div></article>`;
+        }).join('');
+        // fix thumbs with img
+        el.querySelectorAll('.cut-thumb').forEach((node, i) => {
+            if (jobs[i]?.photo) node.innerHTML = `<img src="${jobs[i].photo}" alt="">`;
+        });
+        const empty = $('emptyFuncJobs');
+        if (empty) {
+            empty.classList.toggle('hidden', jobs.length > 0);
+            el.classList.toggle('hidden', jobs.length === 0);
+        }
+        renderPendingBanner();
+    }
+
+    function renderFuncVales() {
+        const el = $('funcValesList');
+        if (!el) return;
+        const m = $('monthFilter').value;
+        const fid = $('funcValeFilter')?.value || '';
+        const list = (state.funcVales || []).filter(v => (v.date || '').startsWith(m) && (!fid || v.funcionarioId === fid)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        el.innerHTML = list.map(v => {
+            const f = getFunc(v.funcionarioId);
+            return `<article class="cut-card vale-card"><div class="cut-thumb vale-thumb">$</div><div class="cut-info"><h3>${money(v.amount)}</h3><div class="cut-meta"><span>${escapeHTML(f?.name || '?')}</span><span>${escapeHTML(v.date)}</span>${v.note ? `<span>${escapeHTML(v.note)}</span>` : ''}</div></div><div class="cut-money"><div class="cut-actions"><button class="mini-btn" data-func-vale-del="${v.id}">Eliminar</button></div></div></article>`;
+        }).join('');
+        const empty = $('emptyFuncVales');
+        if (empty) {
+            empty.classList.toggle('hidden', list.length > 0);
+            el.classList.toggle('hidden', list.length === 0);
+        }
+        const sel = $('funcValeFilter');
+        if (sel) {
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">Todos</option>' + (state.funcionarios || []).map(f => `<option value="${f.id}">${escapeHTML(f.name)}</option>`).join('');
+            sel.value = cur;
+        }
+    }
+
+    function buildWorkerChecks() {
+        const box = $('fjWorkersCheck');
+        if (!box) return;
+        box.innerHTML = (state.funcionarios || []).map(f =>
+            `<label><input type="checkbox" value="${f.id}"> ${escapeHTML(f.name)}</label>`
+        ).join('') || '<p class="muted">Primero añade funcionarios en Equipo.</p>';
+    }
+
+    function addMachineRow(data = {}) {
+        const wrap = $('fjMachineRows');
+        if (!wrap) return;
+        const row = document.createElement('div');
+        row.className = 'machine-row';
+        const opts = (state.funcionarios || []).map(f =>
+            `<option value="${f.id}" ${data.funcionarioId === f.id ? 'selected' : ''}>${escapeHTML(f.name)}</option>`
+        ).join('');
+        row.innerHTML = `
+          <label>Persona<select class="fj-person" required><option value="">—</option>${opts}</select></label>
+          <label>Máquina<select class="fj-machine"><option value="recta" ${data.machine === 'recta' ? 'selected' : ''}>Recta</option><option value="over" ${data.machine === 'over' ? 'selected' : ''}>Over</option></select></label>
+          <label>Prendas<input type="number" class="fj-pcs" min="0" step="1" value="${data.pieces ?? ''}" placeholder="0"></label>`;
+        wrap.appendChild(row);
+        row.querySelectorAll('input,select').forEach(el => el.addEventListener('input', calcMachineTotal));
+        calcMachineTotal();
+    }
+
+    function calcMachineTotal() {
+        let total = 0;
+        document.querySelectorAll('#fjMachineRows .machine-row').forEach(row => {
+            const machine = row.querySelector('.fj-machine')?.value;
+            const pcs = Number(row.querySelector('.fj-pcs')?.value) || 0;
+            const rate = machine === 'over' ? DEFAULT_OVER : DEFAULT_RECTA;
+            total += pcs * rate;
+        });
+        if ($('fjCalcTotal')) $('fjCalcTotal').textContent = money(total);
+        return total;
+    }
+
+    function togglePayMode() {
+        const mode = $('fjPayMode')?.value;
+        $('fjCompletoBox')?.classList.toggle('hidden', mode !== 'completo');
+        $('fjMaquinaBox')?.classList.toggle('hidden', mode !== 'por_maquina');
+        if (mode === 'por_maquina' && $('fjMachineRows') && !$('fjMachineRows').children.length) {
+            addMachineRow();
+        }
+    }
+
+    function openFuncJob() {
+        if (!(state.funcionarios || []).length) {
+            showToast('Primero añade funcionarios en Equipo.');
+            setTab('funcs');
+            return;
+        }
+        $('funcJobForm').reset();
+        $('funcJobId').value = '';
+        $('fjDate').value = todayISO();
+        fjPhotoData = '';
+        $('fjPhotoWrap').classList.add('hidden');
+        $('fjMachineRows').innerHTML = '';
+        buildWorkerChecks();
+        $('fjPayMode').value = 'completo';
+        togglePayMode();
+        $('funcJobModal').classList.remove('hidden');
+    }
+
+    function closeFuncJob() {
+        $('funcJobModal').classList.add('hidden');
+    }
+
+    function openSidebar() {
+        $('sidebar')?.classList.add('open');
+        $('sidebarOverlay')?.classList.remove('hidden');
+        $('sidebar')?.setAttribute('aria-hidden', 'false');
+    }
+    function closeSidebar() {
+        $('sidebar')?.classList.remove('open');
+        $('sidebarOverlay')?.classList.add('hidden');
+        $('sidebar')?.setAttribute('aria-hidden', 'true');
+    }
+
+
     document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
     $('monthFilter').value = monthISO();
     $('monthFilter').addEventListener('change', renderAll);
@@ -518,6 +721,14 @@
         const ix = state.cuts.findIndex(x => x.id === id);
         if (ix >= 0) state.cuts[ix] = c;
         else state.cuts.push(c);
+        const jobId = $('pendingJobId').value;
+        if (jobId && state.funcJobs) {
+            const job = state.funcJobs.find(j => j.id === jobId);
+            if (job) {
+                job.linkedCutId = c.id;
+                job.pendingProvider = false;
+            }
+        }
         if (!save()) return;
         closeCut();
         renderAll();
@@ -626,6 +837,9 @@
             closeConfirm();
             closeQrChoice();
             closeVale();
+            closeFuncJob();
+            $('funcValeModal')?.classList.add('hidden');
+            closeSidebar();
         }
     });
     document.body.classList.toggle('dark', state.theme === 'dark');
@@ -723,6 +937,207 @@
             });
         }
     });
+
+
+    // Sidebar
+    $('menuBtn')?.addEventListener('click', openSidebar);
+    $('closeSidebar')?.addEventListener('click', closeSidebar);
+    $('sidebarOverlay')?.addEventListener('click', closeSidebar);
+    document.querySelectorAll('.sidebar-link').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+    // Completar desde banner / lista
+    document.body.addEventListener('click', e => {
+        const btn = e.target.closest('[data-complete-job]');
+        if (!btn) return;
+        const job = (state.funcJobs || []).find(j => j.id === btn.dataset.completeJob);
+        if (!job) return;
+        setTab('cuts');
+        openCut(null, job);
+    });
+
+    // Funcionarios CRUD
+    $('addFuncBtn')?.addEventListener('click', () => {
+        $('funcForm')?.classList.remove('hidden');
+        $('funcName')?.focus();
+    });
+    $('cancelFunc')?.addEventListener('click', () => {
+        $('funcForm')?.classList.add('hidden');
+        $('funcForm')?.reset();
+    });
+    $('funcForm')?.addEventListener('submit', e => {
+        e.preventDefault();
+        const name = $('funcName').value.trim();
+        if (!name) return;
+        if (!state.funcionarios) state.funcionarios = [];
+        if (state.funcionarios.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+            showToast('Ya existe ese nombre.');
+            return;
+        }
+        state.funcionarios.push({ id: crypto.randomUUID(), name });
+        save();
+        $('funcForm').reset();
+        $('funcForm').classList.add('hidden');
+        renderAll();
+        showToast('Funcionario añadido.');
+    });
+    $('funcsList')?.addEventListener('click', e => {
+        const del = e.target.closest('[data-func-del]');
+        if (!del) return;
+        const f = getFunc(del.dataset.funcDel);
+        if (!f) return;
+        askConfirm('Eliminar funcionario', `¿Eliminar a ${f.name}?`, () => {
+            state.funcionarios = state.funcionarios.filter(x => x.id !== f.id);
+            save();
+            renderAll();
+            showToast('Eliminado.');
+        });
+    });
+
+    $('addFuncJobBtn')?.addEventListener('click', openFuncJob);
+    $('closeFuncJob')?.addEventListener('click', closeFuncJob);
+    $('cancelFuncJob')?.addEventListener('click', closeFuncJob);
+    $('fjPayMode')?.addEventListener('change', togglePayMode);
+    $('fjAddRow')?.addEventListener('click', () => addMachineRow());
+    $('fjPhoto')?.addEventListener('change', async e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            fjPhotoData = await compressImage(file);
+            $('fjPhotoPreview').src = fjPhotoData;
+            $('fjPhotoWrap').classList.remove('hidden');
+        } catch {
+            showToast('No se pudo leer la foto');
+        }
+    });
+    $('fjRemovePhoto')?.addEventListener('click', () => {
+        fjPhotoData = '';
+        $('fjPhoto').value = '';
+        $('fjPhotoWrap').classList.add('hidden');
+    });
+    $('funcJobForm')?.addEventListener('submit', e => {
+        e.preventDefault();
+        const title = $('fjTitle').value.trim();
+        const date = $('fjDate').value;
+        const pieces = Number($('fjPieces').value);
+        const payMode = $('fjPayMode').value;
+        if (!title || !date || !(pieces > 0)) {
+            showToast('Completá fecha, prenda y cantidad.');
+            return;
+        }
+        let workers = [];
+        let totalPay = 0;
+        if (payMode === 'completo') {
+            totalPay = Number($('fjTotalPay').value) || 0;
+            const checked = [...document.querySelectorAll('#fjWorkersCheck input:checked')].map(i => i.value);
+            if (!checked.length) {
+                showToast('Marcá quiénes participaron.');
+                return;
+            }
+            const share = totalPay / checked.length;
+            workers = checked.map(id => ({ funcionarioId: id, pay: share }));
+        } else {
+            document.querySelectorAll('#fjMachineRows .machine-row').forEach(row => {
+                const funcionarioId = row.querySelector('.fj-person')?.value;
+                const machine = row.querySelector('.fj-machine')?.value;
+                const pcs = Number(row.querySelector('.fj-pcs')?.value) || 0;
+                if (!funcionarioId || pcs <= 0) return;
+                const rate = machine === 'over' ? DEFAULT_OVER : DEFAULT_RECTA;
+                const pay = pcs * rate;
+                workers.push({ funcionarioId, machine, pieces: pcs, rate, pay });
+                totalPay += pay;
+            });
+            if (!workers.length) {
+                showToast('Añadí al menos una persona con prendas.');
+                return;
+            }
+        }
+        if (!state.funcJobs) state.funcJobs = [];
+        state.funcJobs.push({
+            id: crypto.randomUUID(),
+            date,
+            title,
+            pieces,
+            photo: fjPhotoData || '',
+            payMode,
+            workers,
+            totalPay,
+            note: $('fjNote').value.trim(),
+            pendingProvider: true,
+            linkedCutId: null,
+            createdAt: new Date().toISOString()
+        });
+        save();
+        closeFuncJob();
+        renderAll();
+        showToast('Trabajo guardado. Completá el corte del proveedor cuando quieras.');
+        setTab('funcJobs');
+    });
+
+    $('funcJobsList')?.addEventListener('click', e => {
+        const del = e.target.closest('[data-func-job-del]');
+        if (!del) return;
+        const id = del.dataset.funcJobDel;
+        askConfirm('Eliminar registro', '¿Eliminar este trabajo de funcionarios?', () => {
+            state.funcJobs = state.funcJobs.filter(j => j.id !== id);
+            save();
+            renderAll();
+            showToast('Eliminado.');
+        });
+    });
+
+    // Func vales
+    $('addFuncValeBtn')?.addEventListener('click', () => {
+        if (!(state.funcionarios || []).length) {
+            showToast('Primero añade funcionarios.');
+            setTab('funcs');
+            return;
+        }
+        const sel = $('fvFuncionario');
+        if (sel) {
+            sel.innerHTML = '<option value="">Seleccionar…</option>' +
+                state.funcionarios.map(f => `<option value="${f.id}">${escapeHTML(f.name)}</option>`).join('');
+        }
+        $('funcValeForm').reset();
+        $('fvDate').value = todayISO();
+        $('funcValeModal').classList.remove('hidden');
+    });
+    $('closeFuncVale')?.addEventListener('click', () => $('funcValeModal').classList.add('hidden'));
+    $('cancelFuncVale')?.addEventListener('click', () => $('funcValeModal').classList.add('hidden'));
+    $('funcValeFilter')?.addEventListener('change', renderFuncVales);
+    $('funcValeForm')?.addEventListener('submit', e => {
+        e.preventDefault();
+        const funcionarioId = $('fvFuncionario').value;
+        const amount = Number($('fvAmount').value);
+        const date = $('fvDate').value;
+        if (!funcionarioId || !(amount > 0) || !date) {
+            showToast('Completá los datos del vale.');
+            return;
+        }
+        if (!state.funcVales) state.funcVales = [];
+        state.funcVales.push({
+            id: crypto.randomUUID(),
+            funcionarioId,
+            amount,
+            date,
+            note: $('fvNote').value.trim()
+        });
+        save();
+        $('funcValeModal').classList.add('hidden');
+        renderAll();
+        showToast('Vale registrado.');
+    });
+    $('funcValesList')?.addEventListener('click', e => {
+        const del = e.target.closest('[data-func-vale-del]');
+        if (!del) return;
+        const id = del.dataset.funcValeDel;
+        askConfirm('Eliminar vale', '¿Eliminar este vale?', () => {
+            state.funcVales = state.funcVales.filter(v => v.id !== id);
+            save();
+            renderAll();
+            showToast('Vale eliminado.');
+        });
+    });
+
 
     // PWA install prompt
     let deferredPrompt = null;

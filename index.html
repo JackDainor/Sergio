@@ -21,13 +21,36 @@
   <div class="topbar-actions">
     <button id="installBtn" class="install-btn hidden" title="Instalar aplicación" aria-label="Instalar aplicación">Instalar</button>
     <button id="themeBtn" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">☼</button>
+    <button id="menuBtn" class="icon-btn" title="Menú" aria-label="Abrir menú">☰</button>
   </div>
 </header>
+
+<!-- Menú lateral -->
+<div id="sidebarOverlay" class="sidebar-overlay hidden"></div>
+<aside id="sidebar" class="sidebar" aria-hidden="true">
+  <div class="sidebar-head">
+    <strong>Menú</strong>
+    <button type="button" class="icon-btn" id="closeSidebar" aria-label="Cerrar">×</button>
+  </div>
+  <nav class="sidebar-nav">
+    <p class="sidebar-label">Proveedores / costura</p>
+    <button type="button" class="sidebar-link active" data-tab="cuts">Cortes</button>
+    <button type="button" class="sidebar-link" data-tab="providers">Proveedores</button>
+    <button type="button" class="sidebar-link" data-tab="reports">Informes PDF</button>
+    <button type="button" class="sidebar-link" data-tab="vales">Vales proveedores</button>
+    <p class="sidebar-label">Funcionarios</p>
+    <button type="button" class="sidebar-link" data-tab="funcs">Equipo</button>
+    <button type="button" class="sidebar-link" data-tab="funcJobs">Producción</button>
+    <button type="button" class="sidebar-link" data-tab="funcVales">Vales funcionarios</button>
+  </nav>
+</aside>
+
 <main class="container">
   <section class="welcome">
     <div><p class="eyebrow">PANEL DE CONTROL</p><h1>Tu taller, en orden.</h1><p class="muted">Controla los cortes, las prendas y el dinero de cada proveedor.</p></div>
     <div class="month-box"><label for="monthFilter">Mes de consulta</label><input type="month" id="monthFilter"></div>
   </section>
+  <div id="pendingJobsBanner" class="pending-banner hidden"></div>
   <section class="stats">
     <article class="stat-card"><span class="stat-icon">▤</span><p>Cortes registrados</p><strong id="statCuts">0</strong><small>En el mes seleccionado</small></article>
     <article class="stat-card"><span class="stat-icon">♧</span><p>Prendas producidas</p><strong id="statPieces">0</strong><small>Total de prendas</small></article>
@@ -70,6 +93,34 @@
     <div id="emptyVales" class="empty hidden"><div class="empty-art">$</div><h3>Sin vales este mes</h3><p>Cuando pidas un adelanto a un proveedor, regístralo aquí para que aparezca en su informe PDF.</p><button class="primary" id="emptyAddValeBtn">Registrar primer vale</button></div>
   </section>
 
+
+  <!-- FUNCIONARIOS: equipo -->
+  <section id="funcsPanel" class="panel hidden">
+    <div class="section-heading"><div><h2>Equipo de funcionarios</h2><p class="muted">Personas que cosen en el taller (pareja o grupo).</p></div><button class="primary" id="addFuncBtn">＋ Nuevo funcionario</button></div>
+    <form id="funcForm" class="inline-form hidden">
+      <label>Nombre<input id="funcName" maxlength="80" required placeholder="Ej. Ana"></label>
+      <button class="primary" type="submit">Guardar</button>
+      <button type="button" class="secondary" id="cancelFunc">Cancelar</button>
+    </form>
+    <div id="funcsList" class="provider-grid"></div>
+    <div id="emptyFuncs" class="empty"><div class="empty-art">👥</div><h3>Sin funcionarios</h3><p>Añade a quienes trabajan en el taller.</p></div>
+  </section>
+
+  <!-- FUNCIONARIOS: producción -->
+  <section id="funcJobsPanel" class="panel hidden">
+    <div class="section-heading"><div><h2>Producción del equipo</h2><p class="muted">Anotá qué hicieron, cómo se paga y cuánto corresponde. Luego podés completar el corte del proveedor con un toque.</p></div><button class="primary" id="addFuncJobBtn">＋ Registrar trabajo</button></div>
+    <div id="funcJobsList" class="cuts-list"></div>
+    <div id="emptyFuncJobs" class="empty hidden"><div class="empty-art">✂</div><h3>Sin registros este mes</h3><p>Cuando el equipo termine un trabajo, registralo aquí.</p></div>
+  </section>
+
+  <!-- FUNCIONARIOS: vales -->
+  <section id="funcValesPanel" class="panel hidden">
+    <div class="section-heading"><div><h2>Vales de funcionarios</h2><p class="muted">Adelantos pedidos por cada persona durante el mes.</p></div><button class="primary" id="addFuncValeBtn">＋ Registrar vale</button></div>
+    <div class="filters"><select id="funcValeFilter"><option value="">Todos</option></select></div>
+    <div id="funcValesList" class="cuts-list"></div>
+    <div id="emptyFuncVales" class="empty hidden"><div class="empty-art">$</div><h3>Sin vales este mes</h3></div>
+  </section>
+
   <footer><span>SY CROP · Moda femenina</span><span>Datos guardados en este dispositivo</span></footer>
 </main>
 <div id="cutModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cutModalTitle">
@@ -77,6 +128,7 @@
     <div class="modal-head"><div><p class="eyebrow">REGISTRO DE PRODUCCIÓN</p><h2 id="cutModalTitle">Registrar corte</h2></div><button class="icon-btn" id="closeCut" aria-label="Cerrar">×</button></div>
     <form id="cutForm">
       <input id="cutId" type="hidden">
+      <input id="pendingJobId" type="hidden">
       <div class="form-grid">
         <label class="full">Proveedor<select id="cutProvider" required><option value="">Selecciona un proveedor</option></select><small>¿No aparece? Añádelo en la sección Proveedores.</small></label>
         <label>Fecha del corte<input id="cutDate" type="date" required></label>
@@ -104,6 +156,65 @@
         <label class="full">Nota <span class="optional">(opcional)</span><input id="valeNote" maxlength="120" placeholder="Ej. Adelanto por material"></label>
       </div>
       <div class="modal-actions"><button type="button" class="secondary" id="cancelVale">Cancelar</button><button type="submit" class="primary">Guardar vale</button></div>
+    </form>
+  </div>
+</div>
+
+
+<div id="funcJobModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card modal-card-wide">
+    <div class="modal-head"><div><p class="eyebrow">FUNCIONARIOS</p><h2 id="funcJobTitle">Registrar trabajo</h2></div><button class="icon-btn" id="closeFuncJob" aria-label="Cerrar">×</button></div>
+    <form id="funcJobForm">
+      <input id="funcJobId" type="hidden">
+      <div class="form-grid">
+        <label>Fecha<input id="fjDate" type="date" required></label>
+        <label>Prendas totales<input id="fjPieces" type="number" min="1" step="1" required placeholder="100"></label>
+        <label class="full">Nombre de la prenda / modelo<input id="fjTitle" maxlength="120" required placeholder="Ej. Crop top negro"></label>
+        <label class="full">Foto <span class="optional">(opcional)</span><input id="fjPhoto" type="file" accept="image/*">
+          <div id="fjPhotoWrap" class="photo-preview-wrap hidden"><img id="fjPhotoPreview" alt=""><button type="button" class="text-btn" id="fjRemovePhoto">Quitar foto</button></div>
+        </label>
+        <label class="full">Forma de pago
+          <select id="fjPayMode" required>
+            <option value="completo">Pago completo (un total a repartir)</option>
+            <option value="por_maquina">Por máquina (recta / over)</option>
+          </select>
+        </label>
+        <div id="fjCompletoBox" class="full form-subbox">
+          <label>Total a pagar al equipo (R$)<input id="fjTotalPay" type="number" min="0" step="0.01" placeholder="140,00"></label>
+          <p class="muted small">Marcá quiénes participaron:</p>
+          <div id="fjWorkersCheck" class="check-list"></div>
+        </div>
+        <div id="fjMaquinaBox" class="full form-subbox hidden">
+          <p class="muted small">Por cada persona: máquina y prendas (o monto).</p>
+          <div id="fjMachineRows"></div>
+          <button type="button" class="secondary" id="fjAddRow">＋ Añadir persona</button>
+          <p style="margin-top:8px">Total calculado: <strong id="fjCalcTotal">R$ 0,00</strong></p>
+        </div>
+        <label class="full">Nota <span class="optional">(opcional)</span><input id="fjNote" maxlength="150"></label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="cancelFuncJob">Cancelar</button>
+        <button type="submit" class="primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="funcValeModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head"><div><p class="eyebrow">VALE FUNCIONARIO</p><h2>Registrar vale</h2></div><button class="icon-btn" id="closeFuncVale" aria-label="Cerrar">×</button></div>
+    <form id="funcValeForm">
+      <input id="funcValeId" type="hidden">
+      <div class="form-grid">
+        <label class="full">Funcionario<select id="fvFuncionario" required><option value="">Seleccionar…</option></select></label>
+        <label>Fecha<input id="fvDate" type="date" required></label>
+        <label>Monto (R$)<input id="fvAmount" type="number" min="0.01" step="0.01" required></label>
+        <label class="full">Nota <span class="optional">(opcional)</span><input id="fvNote" maxlength="120"></label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="cancelFuncVale">Cancelar</button>
+        <button type="submit" class="primary">Guardar vale</button>
+      </div>
     </form>
   </div>
 </div>
