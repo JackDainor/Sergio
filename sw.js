@@ -1,4 +1,4 @@
-const CACHE = 'sy-crop-v5';
+const CACHE = 'sy-crop-v6';
 const ASSETS = [
   './',
   './index.html',

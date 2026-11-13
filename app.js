@@ -33,6 +33,10 @@
                 if (!Array.isArray(x.funcionarios)) x.funcionarios = [];
                 if (!Array.isArray(x.funcJobs)) x.funcJobs = [];
                 if (!Array.isArray(x.funcVales)) x.funcVales = [];
+                if (!x.rates) x.rates = { prenda: 1.4, recta: 1.0, over: 0.4 };
+                if (x.rates.prenda == null) x.rates.prenda = 1.4;
+                if (x.rates.recta == null) x.rates.recta = 1.0;
+                if (x.rates.over == null) x.rates.over = 0.4;
                 return x;
             }
         } catch (e) {}
@@ -43,6 +47,7 @@
             funcionarios: [],
             funcJobs: [],
             funcVales: [],
+            rates: { prenda: 1.4, recta: 1.0, over: 0.4 },
             theme: 'light'
         };
     }
@@ -485,8 +490,28 @@
 
 
     // —— Funcionarios ——
-    const DEFAULT_RECTA = 1.0;
-    const DEFAULT_OVER = 0.4;
+    function getRates() {
+        if (!state.rates) state.rates = { prenda: 1.4, recta: 1.0, over: 0.4 };
+        return state.rates;
+    }
+    function readRatesFromForm(persist) {
+        const r = getRates();
+        if ($('ratePrenda')) r.prenda = Number($('ratePrenda').value);
+        if (Number.isNaN(r.prenda)) r.prenda = 1.4;
+        if ($('rateRecta')) r.recta = Number($('rateRecta').value);
+        if (Number.isNaN(r.recta)) r.recta = 1.0;
+        if ($('rateOver')) r.over = Number($('rateOver').value);
+        if (Number.isNaN(r.over)) r.over = 0.4;
+        state.rates = { prenda: r.prenda, recta: r.recta, over: r.over };
+        if (persist) save();
+        return state.rates;
+    }
+    function fillRatesForm() {
+        const r = getRates();
+        if ($('ratePrenda')) $('ratePrenda').value = r.prenda;
+        if ($('rateRecta')) $('rateRecta').value = r.recta;
+        if ($('rateOver')) $('rateOver').value = r.over;
+    }
 
     function getFunc(id) {
         return (state.funcionarios || []).find(f => f.id === id);
@@ -591,6 +616,7 @@
         box.innerHTML = (state.funcionarios || []).map(f =>
             `<label><input type="checkbox" value="${f.id}"> ${escapeHTML(f.name)}</label>`
         ).join('') || '<p class="muted">Primero añade funcionarios en Equipo.</p>';
+        box.querySelectorAll('input').forEach(inp => inp.addEventListener('change', calcCompletoTotal));
     }
 
     function addMachineRow(data = {}) {
@@ -611,14 +637,28 @@
     }
 
     function calcMachineTotal() {
+        const r = readRatesFromForm();
         let total = 0;
         document.querySelectorAll('#fjMachineRows .machine-row').forEach(row => {
             const machine = row.querySelector('.fj-machine')?.value;
             const pcs = Number(row.querySelector('.fj-pcs')?.value) || 0;
-            const rate = machine === 'over' ? DEFAULT_OVER : DEFAULT_RECTA;
+            const rate = machine === 'over' ? r.over : r.recta;
             total += pcs * rate;
         });
         if ($('fjCalcTotal')) $('fjCalcTotal').textContent = money(total);
+        return total;
+    }
+    function calcCompletoTotal() {
+        const r = readRatesFromForm();
+        const pieces = Number($('fjPieces')?.value) || 0;
+        const total = pieces * (r.prenda || 0);
+        const n = document.querySelectorAll('#fjWorkersCheck input:checked').length;
+        if ($('fjCompletoTotal')) $('fjCompletoTotal').textContent = money(total);
+        if ($('fjCompletoDetail')) {
+            $('fjCompletoDetail').textContent = n
+                ? `(${pieces} × ${money(r.prenda)} · ${n} persona(s) → ${money(total / n)} c/u)`
+                : `(${pieces} × ${money(r.prenda)})`;
+        }
         return total;
     }
 
@@ -644,8 +684,10 @@
         $('fjPhotoWrap').classList.add('hidden');
         $('fjMachineRows').innerHTML = '';
         buildWorkerChecks();
+        fillRatesForm();
         $('fjPayMode').value = 'completo';
         togglePayMode();
+        calcCompletoTotal();
         $('funcJobModal').classList.remove('hidden');
     }
 
@@ -996,7 +1038,14 @@
     $('addFuncJobBtn')?.addEventListener('click', openFuncJob);
     $('closeFuncJob')?.addEventListener('click', closeFuncJob);
     $('cancelFuncJob')?.addEventListener('click', closeFuncJob);
-    $('fjPayMode')?.addEventListener('change', togglePayMode);
+    $('fjPayMode')?.addEventListener('change', () => { togglePayMode(); calcCompletoTotal(); calcMachineTotal(); });
+
+    $('fjPieces')?.addEventListener('input', () => { calcCompletoTotal(); });
+    $('ratePrenda')?.addEventListener('input', () => { readRatesFromForm(true); calcCompletoTotal(); calcMachineTotal(); });
+    $('rateRecta')?.addEventListener('input', () => { readRatesFromForm(true); calcMachineTotal(); });
+    $('rateOver')?.addEventListener('input', () => { readRatesFromForm(true); calcMachineTotal(); });
+    document.getElementById('fjWorkersCheck')?.addEventListener('change', calcCompletoTotal);
+
     $('fjAddRow')?.addEventListener('click', () => addMachineRow());
     $('fjPhoto')?.addEventListener('change', async e => {
         const file = e.target.files?.[0];
@@ -1026,22 +1075,23 @@
         }
         let workers = [];
         let totalPay = 0;
+        const rates = readRatesFromForm(true);
         if (payMode === 'completo') {
-            totalPay = Number($('fjTotalPay').value) || 0;
+            totalPay = pieces * (rates.prenda || 0);
             const checked = [...document.querySelectorAll('#fjWorkersCheck input:checked')].map(i => i.value);
             if (!checked.length) {
                 showToast('Marcá quiénes participaron.');
                 return;
             }
             const share = totalPay / checked.length;
-            workers = checked.map(id => ({ funcionarioId: id, pay: share }));
+            workers = checked.map(id => ({ funcionarioId: id, pay: share, rate: rates.prenda }));
         } else {
             document.querySelectorAll('#fjMachineRows .machine-row').forEach(row => {
                 const funcionarioId = row.querySelector('.fj-person')?.value;
                 const machine = row.querySelector('.fj-machine')?.value;
                 const pcs = Number(row.querySelector('.fj-pcs')?.value) || 0;
                 if (!funcionarioId || pcs <= 0) return;
-                const rate = machine === 'over' ? DEFAULT_OVER : DEFAULT_RECTA;
+                const rate = machine === 'over' ? rates.over : rates.recta;
                 const pay = pcs * rate;
                 workers.push({ funcionarioId, machine, pieces: pcs, rate, pay });
                 totalPay += pay;
@@ -1061,6 +1111,7 @@
             payMode,
             workers,
             totalPay,
+            rates: { ...rates },
             note: $('fjNote').value.trim(),
             pendingProvider: true,
             linkedCutId: null,

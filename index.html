@@ -60,7 +60,11 @@
     <button class="tab active" data-tab="cuts">Cortes</button>
     <button class="tab" data-tab="providers">Proveedores</button>
     <button class="tab" data-tab="reports">Informes PDF</button>
-    <button class="tab" data-tab="vales">Vales</button>
+    <button class="tab" data-tab="vales">Vales proveedores</button>
+    <span class="tab-sep" title="Separación" aria-hidden="true"></span>
+    <button class="tab" data-tab="funcs">Equipo</button>
+    <button class="tab" data-tab="funcJobs">Producción</button>
+    <button class="tab" data-tab="funcVales">Vales funcionarios</button>
   </nav>
   <section id="cutsPanel" class="panel">
     <div class="section-heading"><div><h2>Cortes del mes</h2><p class="muted">Cada bolsa de corte es un registro independiente.</p></div><button class="primary" id="addCutBtn">＋ Registrar corte</button></div>
@@ -173,19 +177,27 @@
         <label class="full">Foto <span class="optional">(opcional)</span><input id="fjPhoto" type="file" accept="image/*">
           <div id="fjPhotoWrap" class="photo-preview-wrap hidden"><img id="fjPhotoPreview" alt=""><button type="button" class="text-btn" id="fjRemovePhoto">Quitar foto</button></div>
         </label>
+        <div class="full form-subbox rates-box">
+          <p class="muted small" style="margin:0 0 8px">Tarifas por prenda (editables). Completo = prendas × tarifa prenda. Máquina = prendas × recta u over.</p>
+          <div class="row rates-row">
+            <label>Prenda completa (R$)<input id="ratePrenda" type="number" min="0" step="0.01" value="1.40"></label>
+            <label>Recta (R$)<input id="rateRecta" type="number" min="0" step="0.01" value="1.00"></label>
+            <label>Over (R$)<input id="rateOver" type="number" min="0" step="0.01" value="0.40"></label>
+          </div>
+        </div>
         <label class="full">Forma de pago
           <select id="fjPayMode" required>
-            <option value="completo">Pago completo (un total a repartir)</option>
+            <option value="completo">Pago completo (prenda × tarifa prenda)</option>
             <option value="por_maquina">Por máquina (recta / over)</option>
           </select>
         </label>
         <div id="fjCompletoBox" class="full form-subbox">
-          <label>Total a pagar al equipo (R$)<input id="fjTotalPay" type="number" min="0" step="0.01" placeholder="140,00"></label>
-          <p class="muted small">Marcá quiénes participaron:</p>
+          <p class="muted small">Se calcula: prendas × tarifa de prenda completa. Marcá quiénes participaron (se reparte en partes iguales):</p>
           <div id="fjWorkersCheck" class="check-list"></div>
+          <p style="margin-top:10px">Total a pagar: <strong id="fjCompletoTotal">R$ 0,00</strong> <span class="muted small" id="fjCompletoDetail"></span></p>
         </div>
         <div id="fjMaquinaBox" class="full form-subbox hidden">
-          <p class="muted small">Por cada persona: máquina y prendas (o monto).</p>
+          <p class="muted small">Por cada persona: máquina y prendas que hizo. Pago = prendas × tarifa de esa máquina.</p>
           <div id="fjMachineRows"></div>
           <button type="button" class="secondary" id="fjAddRow">＋ Añadir persona</button>
           <p style="margin-top:8px">Total calculado: <strong id="fjCalcTotal">R$ 0,00</strong></p>
