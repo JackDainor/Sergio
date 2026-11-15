@@ -30,10 +30,6 @@
             const x = JSON.parse(localStorage.getItem(STORE_KEY));
             if (x && Array.isArray(x.providers) && Array.isArray(x.cuts)) {
                 if (!Array.isArray(x.vales)) x.vales = [];
-                if (!Array.isArray(x.funcionarios)) x.funcionarios = [];
-                if (!Array.isArray(x.funcJobs)) x.funcJobs = [];
-                if (!Array.isArray(x.funcVales)) x.funcVales = [];
-                if (!x.rates) x.rates = { prenda: 1.4, recta: 1.0, over: 0.4 };
                 if (x.rates.prenda == null) x.rates.prenda = 1.4;
                 if (x.rates.recta == null) x.rates.recta = 1.0;
                 if (x.rates.over == null) x.rates.over = 0.4;
@@ -44,10 +40,6 @@
             providers: [],
             cuts: [],
             vales: [],
-            funcionarios: [],
-            funcJobs: [],
-            funcVales: [],
-            rates: { prenda: 1.4, recta: 1.0, over: 0.4 },
             theme: 'light'
         };
     }

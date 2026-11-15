@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#193b32">
-  <meta name="description" content="SY CROP — Control de producción de costura. Registra cortes, proveedores e informes PDF.">
+  <meta name="description" content="SY CROP Proveedores — cortes, proveedores, vales e informes PDF.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SY CROP">
@@ -71,7 +71,7 @@
     <div id="valesList" class="cuts-list"></div>
     <div id="emptyVales" class="empty hidden"><div class="empty-art">$</div><h3>Sin vales este mes</h3><p>Cuando pidas un adelanto a un proveedor, regístralo aquí para que aparezca en su informe PDF.</p><button class="primary" id="emptyAddValeBtn">Registrar primer vale</button></div>
   </section>
-<footer><span>SY CROP · Moda femenina</span><span>Datos guardados en este dispositivo</span></footer>
+<footer><span>SY CROP · Proveedores</span><span>Datos guardados en este dispositivo</span></footer>
 </main>
 <div id="cutModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cutModalTitle">
   <div class="modal-card">
@@ -105,24 +105,6 @@
         <label class="full">Nota <span class="optional">(opcional)</span><input id="valeNote" maxlength="120" placeholder="Ej. Adelanto por material"></label>
       </div>
       <div class="modal-actions"><button type="button" class="secondary" id="cancelVale">Cancelar</button><button type="submit" class="primary">Guardar vale</button></div>
-    </form>
-  </div>
-</div>
-
-
-<button class="icon-btn" id="closeFuncVale" aria-label="Cerrar">×</button></div>
-    <form id="funcValeForm">
-      <input id="funcValeId" type="hidden">
-      <div class="form-grid">
-        <label class="full">Funcionario<select id="fvFuncionario" required><option value="">Seleccionar…</option></select></label>
-        <label>Fecha<input id="fvDate" type="date" required></label>
-        <label>Monto (R$)<input id="fvAmount" type="number" min="0.01" step="0.01" required></label>
-        <label class="full">Nota <span class="optional">(opcional)</span><input id="fvNote" maxlength="120"></label>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="secondary" id="cancelFuncVale">Cancelar</button>
-        <button type="submit" class="primary">Guardar vale</button>
-      </div>
     </form>
   </div>
 </div>
